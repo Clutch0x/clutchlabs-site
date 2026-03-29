@@ -802,6 +802,31 @@ document.getElementById(‘admin-panel’).classList.toggle(‘show’, show);
 window.addEventListener(‘hashchange’, checkRoute);
 checkRoute();
 
+// Contact form — standalone handler works with or without Firebase
+document.getElementById(‘cform’).addEventListener(‘submit’, async function(e) {
+e.preventDefault();
+const btn = document.getElementById(‘sbtn’);
+btn.disabled = true;
+btn.textContent = ‘Sending…’;
+const data = {
+name: document.getElementById(‘fn’).value,
+business: document.getElementById(‘fb’).value,
+phone: document.getElementById(‘fp’).value,
+email: document.getElementById(‘fe’).value,
+service: document.getElementById(‘fs’).value,
+message: document.getElementById(‘fm’).value,
+contacted: false,
+createdAt: Date.now()
+};
+try {
+if (window._db && window._fbFns) {
+await window._fbFns.addDoc(window._fbFns.collection(window._db, ‘leads’), data);
+}
+} catch(err) { console.error(‘Lead error:’, err); }
+document.getElementById(‘cform’).style.display = ‘none’;
+document.getElementById(‘fsuccess’).classList.add(‘show’);
+});
+
 // Firebase logic
 window.addEventListener(‘firebaseReady’, () => {
 const fns = window._fbFns;
@@ -873,24 +898,4 @@ list.innerHTML = leads.map(l => `<div class="lead ${l.contacted ? 'done' : ''}" 
 window.markLead = async (id, current) => {
 try { await updateDoc(doc(db, ‘leads’, id), { contacted: !current }); loadLeads(); } catch(e) {}
 };
-
-// Contact form
-document.getElementById(‘cform’).addEventListener(‘submit’, async e => {
-e.preventDefault();
-const btn = document.getElementById(‘sbtn’);
-btn.disabled = true; btn.textContent = ‘Sending…’;
-try {
-await addDoc(collection(db, ‘leads’), {
-name: document.getElementById(‘fn’).value,
-business: document.getElementById(‘fb’).value,
-phone: document.getElementById(‘fp’).value,
-email: document.getElementById(‘fe’).value,
-service: document.getElementById(‘fs’).value,
-message: document.getElementById(‘fm’).value,
-contacted: false,
-createdAt: Date.now()
-});
-} catch(err) { console.error(‘Lead save error:’, err); }
-document.getElementById(‘cform’).style.display = ‘none’;
-document.getElementById(‘fsuccess’).classList.add(‘show’);
 });
