@@ -888,4 +888,9 @@ email: document.getElementById(‘fe’).value,
 service: document.getElementById(‘fs’).value,
 message: document.getElementById(‘fm’).value,
 contacted: false,
-createdAt: Date
+createdAt: Date.now()
+});
+} catch(err) { console.error(‘Lead save error:’, err); }
+document.getElementById(‘cform’).style.display = ‘none’;
+document.getElementById(‘fsuccess’).classList.add(‘show’);
+});
