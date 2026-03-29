@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clutch Labs — Web Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+  FIREBASE SETUP — REPLACE WITH YOUR OWN CONFIG
+  1. Go to console.firebase.google.com
+  2. Create a project called "Clutch Labs"
+  3. Click Web app and copy your config below
+  4. In Firebase console enable:
+     - Firestore Database (start in test mode)
+     - Authentication > Sign-in method > Email/Password
+  5. In Auth, create one user with your email + password
+  Navigate to /#admin to access the owner panel
+============================================================ -->
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, orderBy, query, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  // ⬇ PASTE YOUR FIREBASE CONFIG HERE
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  try {
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") throw new Error("Not configured");
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    window._db = db; window._auth = auth;
+    window._fbFns = { collection, addDoc, getDocs, orderBy, query, updateDoc, doc, signInWithEmailAndPassword, signOut, onAuthStateChanged };
+    window._firebaseReady = true;
+  } catch(e) {
+    window._firebaseReady = false;
+    console.warn('Firebase demo mode — plug in your config to activate backend.');
+  }
+  window.dispatchEvent(new Event('firebaseReady'));
+</script>
+
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --black: #080808;
+  --dark: #0d0d0d;
+  --card: #121212;
+  --border: #1e1e1e;
+  --border2: #2a2a2a;
+  --amber: #D4A017;
+  --amber2: #E8B420;
+  --amber-dim: rgba(212,160,23,0.1);
+  --white: #F2F0ED;
+  --muted: #555;
+  --mid: #888;
+  --light: #aaa;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--black); color: var(--white); font-family: 'DM Sans', sans-serif; font-weight: 300; overflow-x: hidden; }
+
+/* NOISE */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 9998; opacity: 0.5;
+}
+
+/* NAV */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 40px;
+  border-bottom: 1px solid transparent;
+  transition: background 0.4s, border-color 0.4s;
+}
+nav.scrolled { background: rgba(8,8,8,0.95); border-color: var(--border); backdrop-filter: blur(16px); }
+.nav-wordmark { display: flex; align-items: center; text-decoration: none; }
+.nav-links { display: flex; gap: 32px; list-style: none; align-items: center; }
+.nav-links a {
+  font-family: 'Space Mono', monospace; font-size: 0.62rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--mid); text-decoration: none; transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--amber); }
+.nav-cta {
+  background: var(--amber) !important; color: var(--black) !important;
+  padding: 10px 20px; font-weight: 700 !important;
+  transition: background 0.2s !important;
+}
+.nav-cta:hover { background: var(--amber2) !important; }
+.hamburger { display: none; }
+.mobile-menu { display: none; }
+
+/* HERO */
+.hero {
+  min-height: 100vh; display: flex; flex-direction: column;
+  justify-content: flex-end; padding: 0 40px 80px; position: relative; overflow: hidden;
+}
+.hero-glow {
+  position: absolute; top: 10%; left: -20%;
+  width: 70vw; height: 70vw;
+  background: radial-gradient(ellipse, rgba(245,158,11,0.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-grid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(245,158,11,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(245,158,11,0.04) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse 100% 100% at 10% 90%, black 20%, transparent 75%);
+}
+.hero-eyebrow {
+  font-family: 'Space Mono', monospace; font-size: 0.62rem;
+  letter-spacing: 0.28em; text-transform: uppercase; color: var(--amber);
+  margin-bottom: 20px; display: flex; align-items: center; gap: 12px;
+}
+.hero-eyebrow::before { content: ''; display: block; width: 28px; height: 1px; background: var(--amber); }
+.hero-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(5.5rem, 20vw, 21rem);
+  line-height: 0.84; letter-spacing: -0.01em;
+}
+.hero-title .outline {
+  -webkit-text-stroke: 1px rgba(245,158,11,0.25);
+  color: transparent; display: block;
+  transition: -webkit-text-stroke-color 0.4s;
+}
+.hero-title:hover .outline { -webkit-text-stroke-color: var(--amber); }
+.hero-bottom {
+  margin-top: 48px; display: flex; justify-content: space-between;
+  align-items: flex-end; gap: 24px;
+}
+.hero-desc { max-width: 380px; font-size: 1rem; line-height: 1.8; color: var(--mid); }
+.hero-desc strong { color: var(--light); font-weight: 400; }
+.hero-actions { display: flex; flex-direction: column; gap: 12px; align-items: flex-end; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--amber); color: var(--black);
+  font-family: 'Space Mono', monospace; font-size: 0.7rem;
+  font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  text-decoration: none; padding: 18px 30px;
+  transition: background 0.2s, transform 0.2s; white-space: nowrap;
+}
+.btn-primary:hover { background: var(--amber2); transform: translateY(-2px); }
+.btn-ghost {
+  font-family: 'Space Mono', monospace; font-size: 0.62rem;
+  letter-spacing: 0.15em; color: var(--muted); text-decoration: none;
+  text-transform: uppercase; border-bottom: 1px solid var(--border2);
+  padding-bottom: 2px; transition: color 0.2s, border-color 0.2s; white-space: nowrap;
+}
+.btn-ghost:hover { color: var(--amber); border-color: var(--amber); }
+
+/* TRUST STRIP */
+.trust-strip {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 0; background: var(--card);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+}
+.trust-item {
+  font-family: 'Space Mono', monospace; font-size: 0.62rem;
+  letter-spacing: 0.1em; color: var(--light);
+  padding: 6px 20px; border-right: 1px solid var(--border2);
+}
+.trust-item:last-child { border-right: none; }
+
+/* TICKER */
+.ticker { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); overflow: hidden; padding: 13px 0; background: var(--dark); }
+.ticker-track { display: flex; animation: ticker 28s linear infinite; white-space: nowrap; }
+.ticker-item {
+  font-family: 'Space Mono', monospace; font-size: 0.6rem;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted);
+  padding: 0 40px; display: flex; align-items: center; gap: 40px; flex-shrink: 0;
+}
+.td { color: var(--amber); }
+
+/* SECTIONS */
+section { padding: 100px 40px; position: relative; }
+.stag { display: inline-flex; align-items: center; gap: 10px; font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--amber); margin-bottom: 20px; }
+.stag::before { content: ''; display: block; width: 20px; height: 1px; background: var(--amber); }
+.sh { font-family: 'Bebas Neue', sans-serif; font-size: clamp(3rem, 9vw, 8rem); line-height: 0.88; letter-spacing: 0.02em; margin-bottom: 64px; }
+
+/* SERVICES */
+#services { background: var(--dark); }
+.packages { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 1px; }
+.pkg { background: var(--card); padding: 48px 36px; position: relative; transition: background 0.3s; }
+.pkg.featured { background: #161410; }
+.pkg.featured::before {
+  content: 'MOST POPULAR'; position: absolute; top: 0; left: 0; right: 0;
+  background: var(--amber); color: var(--black);
+  font-family: 'Space Mono', monospace; font-size: 0.56rem; font-weight: 700;
+  letter-spacing: 0.2em; text-align: center; padding: 8px;
+}
+.pkg:hover { background: #181818; }
+.pkg.featured:hover { background: #1b1810; }
+.pkg-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.06em; margin-bottom: 8px; margin-top: 20px; }
+.pkg-price { font-family: 'Bebas Neue', sans-serif; font-size: 3.5rem; color: var(--amber); line-height: 1; margin-bottom: 4px; }
+.pkg-price span { font-family: 'DM Sans', sans-serif; font-size: 1rem; color: var(--muted); font-weight: 300; }
+.pkg-sub { font-family: 'Space Mono', monospace; font-size: 0.58rem; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 24px; }
+.pkg-div { height: 1px; background: var(--border2); margin-bottom: 24px; }
+.pkg-feats { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+.pkg-feats li { font-size: 0.87rem; color: var(--mid); display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
+.pkg-feats li::before { content: '→'; color: var(--amber); flex-shrink: 0; }
+.services-sub { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-top: none; }
+.svc { background: var(--card); padding: 30px 26px; }
+
+.svc-icon { font-size: 1.5rem; margin-bottom: 12px; display: block; }
+.svc-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; letter-spacing: 0.05em; margin-bottom: 8px; }
+.svc-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+
+/* PORTFOLIO */
+#portfolio { background: var(--black); }
+.pf-featured { background: var(--card); border: 1px solid var(--border); margin-bottom: 1px; }
+.pf-info { background: var(--card); padding: 52px 44px; }
+.pf-tag { font-family: 'Space Mono', monospace; font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber); margin-bottom: 14px; }
+.pf-title { font-family: 'Bebas Neue', sans-serif; font-size: 3.2rem; letter-spacing: 0.04em; margin-bottom: 18px; line-height: 1; }
+.pf-desc { font-size: 0.92rem; color: var(--mid); line-height: 1.75; margin-bottom: 26px; }
+.pf-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.pf-list li { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--mid); display: flex; align-items: center; gap: 10px; }
+.pf-list li::before { content: '✓'; color: var(--amber); }
+.pf-vis { background: #0e0c09; display: flex; align-items: center; justify-content: center; padding: 40px; min-height: 380px; }
+.bmock { width: 100%; max-width: 320px; background: #181818; border-radius: 8px; overflow: hidden; border: 1px solid var(--border2); box-shadow: 0 40px 80px rgba(0,0,0,0.7); }
+.bbar { background: #111; padding: 10px 14px; display: flex; align-items: center; gap: 6px; }
+.bdot { width: 8px; height: 8px; border-radius: 50%; }
+.burl { margin-left: 8px; background: #1a1a1a; border-radius: 3px; padding: 4px 10px; font-family: 'Space Mono', monospace; font-size: 0.5rem; color: var(--muted); flex: 1; }
+.bbody { padding: 28px 20px; background: linear-gradient(135deg, #091818 0%, #060f0f 100%); min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.mlogo { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: #4ECDC4; letter-spacing: 0.12em; }
+.msub { font-family: 'Space Mono', monospace; font-size: 0.48rem; color: #555; letter-spacing: 0.2em; }
+.mbtn { margin-top: 10px; background: #4ECDC4; color: #000; font-family: 'Space Mono', monospace; font-size: 0.52rem; font-weight: 700; letter-spacing: 0.1em; padding: 7px 18px; border-radius: 2px; }
+.mlang { font-family: 'Space Mono', monospace; font-size: 0.45rem; color: #444; letter-spacing: 0.1em; }
+.pf-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-top: none; }
+.pg { background: var(--card); padding: 36px 32px; transition: background 0.3s; }
+.pg:hover { background: #161616; }
+.pg-tag { font-family: 'Space Mono', monospace; font-size: 0.57rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--amber); margin-bottom: 12px; }
+.pg-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.04em; margin-bottom: 10px; }
+.pg-desc { font-size: 0.83rem; color: var(--muted); line-height: 1.65; }
+.avail { margin-top: 18px; display: inline-flex; align-items: center; gap: 8px; font-family: 'Space Mono', monospace; font-size: 0.57rem; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; }
+.adot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: blink 2s infinite; }
+
+/* ABOUT */
+#about { background: var(--dark); }
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: start; }
+.about-body p { font-size: 0.97rem; line-height: 1.85; color: var(--mid); margin-bottom: 20px; }
+.about-body p strong { color: var(--white); font-weight: 400; }
+.about-body p em { font-family: 'Instrument Serif', serif; font-style: italic; color: var(--amber); font-size: 1.05em; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 20px; }
+.st { background: var(--card); padding: 26px 22px; transition: background 0.3s; }
+.st:hover { background: #181818; }
+.st-n { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--amber); line-height: 1; margin-bottom: 6px; }
+.st-l { font-family: 'Space Mono', monospace; font-size: 0.57rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.badge { border: 1px solid var(--border2); background: var(--card); padding: 22px 26px; display: flex; align-items: center; gap: 16px; }
+.badge-i { width: 42px; height: 42px; background: var(--amber-dim); border: 1px solid rgba(245,158,11,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+.badge-t { font-size: 0.85rem; color: var(--mid); line-height: 1.6; }
+.badge-t strong { color: var(--amber); font-weight: 500; }
+
+/* CONTACT */
+#contact { background: var(--black); }
+.contact-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 72px; align-items: start; }
+.c-desc { font-size: 0.97rem; color: var(--mid); line-height: 1.8; margin-bottom: 36px; }
+.c-info { display: flex; flex-direction: column; gap: 14px; }
+.c-row { display: flex; align-items: center; gap: 14px; font-size: 0.87rem; color: var(--mid); }
+.c-icon { width: 36px; height: 36px; border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+.cform { display: flex; flex-direction: column; gap: 14px; }
+.frow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.fg { display: flex; flex-direction: column; gap: 7px; }
+.fg label { font-family: 'Space Mono', monospace; font-size: 0.57rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.fg input, .fg select, .fg textarea {
+  background: var(--card); border: 1px solid var(--border2);
+  color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.92rem;
+  padding: 13px 15px; outline: none; transition: border-color 0.2s;
+  width: 100%; appearance: none; -webkit-appearance: none;
+}
+.fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--amber); }
+.fg textarea { resize: vertical; min-height: 110px; }
+.fg select { cursor: pointer; }
+.fg select option { background: var(--card); }
+.sbtn {
+  background: var(--amber); color: var(--black); border: none;
+  font-family: 'Space Mono', monospace; font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase; padding: 18px 32px;
+  cursor: pointer; transition: background 0.2s, transform 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+}
+.sbtn:hover { background: var(--amber2); transform: translateY(-1px); }
+.sbtn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.fsuccess { display: none; padding: 24px; border: 1px solid var(--amber); background: var(--amber-dim); text-align: center; }
+.fsuccess.show { display: block; }
+.fsuccess p { color: var(--amber); font-family: 'Space Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em; }
+
+/* FOOTER */
+footer { background: var(--dark); border-top: 1px solid var(--border); padding: 36px 40px; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+.fl { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.flink { font-family: 'Space Mono', monospace; font-size: 0.57rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+.flink:hover { color: var(--amber); }
+.fcopy { font-family: 'Space Mono', monospace; font-size: 0.57rem; letter-spacing: 0.1em; color: var(--muted); }
+
+/* ADMIN PANEL */
+#admin-panel { display: none; position: fixed; inset: 0; background: #050505; z-index: 1000; overflow-y: auto; }
+#admin-panel.show { display: block; }
+.alog { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
+.alog-box { width: 100%; max-width: 360px; border: 1px solid var(--border2); background: var(--card); padding: 44px 36px; }
+.alog-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.08em; margin-bottom: 6px; }
+.alog-sub { font-family: 'Space Mono', monospace; font-size: 0.58rem; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 28px; }
+.ainput { width: 100%; background: var(--dark); border: 1px solid var(--border2); color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; padding: 13px 15px; outline: none; margin-bottom: 10px; transition: border-color 0.2s; }
+.ainput:focus { border-color: var(--amber); }
+.alog-btn { width: 100%; background: var(--amber); color: var(--black); border: none; font-family: 'Space Mono', monospace; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 15px; cursor: pointer; transition: background 0.2s; margin-top: 6px; }
+.alog-btn:hover { background: var(--amber2); }
+.aerr { font-family: 'Space Mono', monospace; font-size: 0.58rem; color: #ef4444; letter-spacing: 0.08em; margin-top: 6px; display: none; }
+.aerr.show { display: block; }
+.adash { display: none; padding: 40px; max-width: 1100px; margin: 0 auto; }
+.adash.show { display: block; }
+.atop { display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.atitle { font-family: 'Bebas Neue', sans-serif; font-size: 1.9rem; letter-spacing: 0.08em; }
+.atitle span { color: var(--amber); }
+.aout { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em; color: var(--muted); background: none; border: 1px solid var(--border2); padding: 9px 16px; cursor: pointer; text-transform: uppercase; transition: all 0.2s; }
+.aout:hover { color: var(--amber); border-color: var(--amber); }
+.astats { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 36px; }
+.astat { background: var(--card); border: 1px solid var(--border); padding: 22px; }
+.astat-n { font-family: 'Bebas Neue', sans-serif; font-size: 2.4rem; color: var(--amber); }
+.astat-l { font-family: 'Space Mono', monospace; font-size: 0.56rem; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+.asec-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.06em; margin-bottom: 14px; color: var(--light); }
+.leads { display: flex; flex-direction: column; gap: 10px; }
+.lead { background: var(--card); border: 1px solid var(--border); padding: 22px; display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: start; }
+.lead.done { opacity: 0.45; }
+.lead-name { font-size: 1rem; font-weight: 500; margin-bottom: 4px; }
+.lead-meta { font-family: 'Space Mono', monospace; font-size: 0.56rem; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+.lead-svc { display: inline-block; font-family: 'Space Mono', monospace; font-size: 0.53rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); border: 1px solid rgba(245,158,11,0.3); padding: 3px 9px; margin-bottom: 8px; }
+.lead-msg { font-size: 0.84rem; color: var(--mid); line-height: 1.6; }
+.markbtn { font-family: 'Space Mono', monospace; font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; background: none; border: 1px solid var(--border2); color: var(--muted); padding: 8px 12px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.markbtn:hover { border-color: var(--amber); color: var(--amber); }
+.noleads { font-family: 'Space Mono', monospace; font-size: 0.66rem; letter-spacing: 0.1em; color: var(--muted); text-align: center; padding: 44px; border: 1px solid var(--border); background: var(--card); }
+
+/* ANIMATIONS */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+.reveal { opacity: 1; transform: translateY(0); transition: opacity 0.75s ease, transform 0.75s ease; }
+.reveal.animate { opacity: 0; transform: translateY(20px); }
+.reveal.animate.visible { opacity: 1; transform: translateY(0); }
+.d1 { transition-delay: 0.1s; } .d2 { transition-delay: 0.2s; } .d3 { transition-delay: 0.3s; }
+
+/* MONTHLY PLANS */
+.monthly-wrap { margin-top: 1px; background: var(--dark); border: 1px solid var(--border); padding: 48px 40px; }
+.monthly-header { text-align: center; margin-bottom: 40px; }
+.monthly-title { font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; letter-spacing: 0.04em; margin-bottom: 8px; }
+.monthly-sub { font-size: 0.92rem; color: var(--mid); max-width: 480px; margin: 0 auto; line-height: 1.65; }
+.monthly-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 700px; margin: 0 auto; }
+.monthly-card { background: var(--card); border: 1px solid var(--border); padding: 36px 28px; position: relative; }
+.monthly-card.featured { border-color: var(--amber); }
+.mc-pop { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--amber); color: var(--black); font-family: 'Space Mono', monospace; font-size: 0.58rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 14px; white-space: nowrap; }
+.mc-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 0.06em; margin-bottom: 6px; }
+.mc-price { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--amber); line-height: 1; margin-bottom: 4px; }
+.mc-price span { font-family: 'DM Sans', sans-serif; font-size: 1rem; color: var(--muted); font-weight: 300; }
+.mc-sub { font-family: 'Space Mono', monospace; font-size: 0.58rem; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 20px; }
+.mc-div { height: 1px; background: var(--border2); margin-bottom: 20px; }
+.mc-feats { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+.mc-feats li { font-size: 0.85rem; color: var(--mid); display: flex; align-items: center; gap: 8px; }
+.mc-feats li::before { content: '→'; color: var(--amber); flex-shrink: 0; }
+.mc-btn { display: block; text-align: center; background: var(--border2); color: var(--light); font-family: 'Space Mono', monospace; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 14px; text-decoration: none; transition: all 0.2s; }
+.mc-btn:hover { background: var(--border); color: var(--white); }
+.featured-btn { background: var(--amber) !important; color: var(--black) !important; }
+.featured-btn:hover { background: var(--amber2) !important; }
+@media (max-width: 560px) { .monthly-grid { grid-template-columns: 1fr; } .monthly-wrap { padding: 36px 24px; } }
+
+/* RESTAURANT HOOK */
+.restaurant-hook {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 48px;
+  background: #0e0c09; border: 1px solid var(--border);
+  padding: 56px 48px; margin-top: 1px; align-items: center;
+}
+.rh-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2.5rem, 6vw, 5rem); line-height: 0.9; letter-spacing: 0.02em; margin-bottom: 16px; }
+.rh-desc { font-size: 0.95rem; color: var(--mid); line-height: 1.75; margin-bottom: 8px; }
+.rh-right { display: flex; flex-direction: column; gap: 2px; }
+.rh-stat { background: var(--card); border: 1px solid var(--border); padding: 24px 28px; }
+.rh-n { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--amber); line-height: 1; margin-bottom: 4px; }
+.rh-l { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .maint-box { flex-direction: column; }
+  .restaurant-hook { grid-template-columns: 1fr; padding: 40px 24px; gap: 32px; }
+}
+@media (max-width: 900px) {
+  nav { padding: 18px 24px; }
+  .nav-links li:not(:last-child) { display: none; }
+  .nav-links { gap: 0; }
+  .hero { padding: 0 24px 56px; }
+  .hero-bottom { flex-direction: column; align-items: flex-start; }
+  .hero-actions { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
+  section { padding: 72px 24px; }
+  .packages { grid-template-columns: 1fr; }
+  .services-sub { grid-template-columns: 1fr 1fr; }
+  .pf-featured { grid-template-columns: 1fr; }
+  .pf-vis { min-height: 260px; }
+  .pf-grid { grid-template-columns: 1fr; }
+  .about-grid { grid-template-columns: 1fr; gap: 48px; }
+  .contact-grid { grid-template-columns: 1fr; gap: 48px; }
+  .frow { grid-template-columns: 1fr; }
+  footer { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .astats { grid-template-columns: 1fr 1fr; }
+  .adash { padding: 20px; }
+  .lead { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .services-sub { grid-template-columns: 1fr; }
+  .astats { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+</head>
+<body>
+
+<!-- ADMIN PANEL -->
+
+<div id="admin-panel">
+  <div class="alog" id="alog-view">
+    <div class="alog-box">
+      <div class="alog-title">CLUTCH<span style="color:var(--amber)">.</span>ADMIN</div>
+      <div class="alog-sub">Owner access only · Clutch Labs</div>
+      <input type="email" class="ainput" id="aemail" placeholder="Email address" autocomplete="email">
+      <input type="password" class="ainput" id="apass" placeholder="Password" autocomplete="current-password">
+      <div class="aerr" id="aerr">Wrong email or password.</div>
+      <button class="alog-btn" id="alog-btn">Sign In →</button>
+    </div>
+  </div>
+  <div class="adash" id="adash">
+    <div class="atop">
+      <div class="atitle">LEADS <span>DASHBOARD</span></div>
+      <button class="aout" id="aout-btn">Sign Out</button>
+    </div>
+    <div class="astats">
+      <div class="astat"><div class="astat-n" id="s-total">0</div><div class="astat-l">Total Inquiries</div></div>
+      <div class="astat"><div class="astat-n" id="s-new">0</div><div class="astat-l">New / Unread</div></div>
+      <div class="astat"><div class="astat-n" id="s-done">0</div><div class="astat-l">Contacted</div></div>
+    </div>
+    <div class="asec-title">All Inquiries</div>
+    <div class="leads" id="leads-list"><div class="noleads">Loading...</div></div>
+  </div>
+</div>
+
+<!-- MOBILE MENU -->
+
+<div class="mobile-menu" id="mmenu">
+  <a href="#services" onclick="closeMM()">Services</a>
+  <a href="#portfolio" onclick="closeMM()">Work</a>
+  <a href="#about" onclick="closeMM()">About</a>
+  <a href="#contact" onclick="closeMM()">Contact</a>
+</div>
+
+<!-- NAV -->
+
+<nav id="nav">
+  <a href="#" class="nav-wordmark">
+    <svg width="158" height="30" viewBox="0 0 158 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Geometric bracket mark -->
+      <path d="M3 5 L3 25 L11 25 L11 21.5 L6.5 21.5 L6.5 8.5 L11 8.5 L11 5 Z" fill="#D4A017"/>
+      <rect x="3" y="5" width="9" height="3" fill="#D4A017"/>
+      <rect x="3" y="22" width="9" height="3" fill="#D4A017"/>
+      <!-- CLUTCH -->
+      <text x="18" y="22" font-family="'Bebas Neue', sans-serif" font-size="21" fill="#F2F0ED" letter-spacing="1.5">CLUTCH</text>
+      <!-- dot -->
+      <circle cx="96" cy="18" r="2.5" fill="#D4A017"/>
+      <!-- LABS -->
+      <text x="102" y="22" font-family="'Space Mono', monospace" font-size="9" fill="#555" letter-spacing="3">LABS</text>
+    </svg>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#services">Services</a></li>
+    <li><a href="#portfolio">Work</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a href="#contact" class="nav-cta">Get a Quote</a></li>
+  </ul>
+  <button class="hamburger" id="ham" onclick="toggleMM()"><span></span><span></span><span></span></button>
+</nav>
+
+<!-- HERO -->
+
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-eyebrow">Web Studio — Built for Service Businesses</div>
+  <h1 class="hero-title">YOUR SITE<span class="outline">WORKS 24/7</span></h1>
+  <div class="hero-bottom">
+    <p class="hero-desc">We build high-converting websites that bring you more bookings, calls, and orders. <strong>Live in as little as 3 days.</strong></p>
+    <div class="hero-actions">
+      <a href="#contact" class="btn-primary">Start a Project <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a>
+      <a href="#portfolio" class="btn-ghost">See our work ↓</a>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST STRIP -->
+
+<div class="trust-strip">
+  <div class="trust-item">✔ Built for service businesses & restaurants</div>
+  <div class="trust-item">✔ Online booking & ordering built-in</div>
+  <div class="trust-item">✔ Mobile-first & built to convert</div>
+  <div class="trust-item">✔ English & Spanish support</div>
+</div>
+
+<!-- TICKER -->
+
+<div class="ticker">
+  <div class="ticker-track">
+    <div class="ticker-item">Web Design <span class="td">✦</span> Mobile First <span class="td">✦</span> Bilingual EN/ES <span class="td">✦</span> Booking Systems <span class="td">✦</span> Owner Dashboards <span class="td">✦</span> Stripe & Square <span class="td">✦</span> SMS Notifications <span class="td">✦</span> Fast Delivery <span class="td">✦</span></div>
+    <div class="ticker-item">Web Design <span class="td">✦</span> Mobile First <span class="td">✦</span> Bilingual EN/ES <span class="td">✦</span> Booking Systems <span class="td">✦</span> Owner Dashboards <span class="td">✦</span> Stripe & Square <span class="td">✦</span> SMS Notifications <span class="td">✦</span> Fast Delivery <span class="td">✦</span></div>
+  </div>
+</div>
+
+<!-- SERVICES -->
+
+<section id="services">
+  <div class="stag">What we build</div>
+  <h2 class="sh reveal">SERVICES &<br>PRICING</h2>
+  <div class="packages">
+    <div class="pkg reveal">
+      <div class="pkg-name">Starter</div>
+      <div class="pkg-price">$499<span>+</span></div>
+      <div class="pkg-sub">One-time · ~3 days · Solo service businesses</div>
+      <div class="pkg-div"></div>
+      <ul class="pkg-feats">
+        <li>Custom design — no templates</li>
+        <li>Mobile responsive, up to 4 pages</li>
+        <li>Appointment booking system</li>
+        <li>Customer cancel / reschedule self-service</li>
+        <li>Stripe OR Square payments integrated</li>
+        <li>SMS + Email notifications to owner & customer</li>
+        <li>Social media links integrated</li>
+        <li>Firebase cloud database</li>
+        <li>Deployed & live on your domain</li>
+      </ul>
+    </div>
+    <div class="pkg featured reveal d1">
+      <div class="pkg-name">Standard</div>
+      <div class="pkg-price">$999<span>+</span></div>
+      <div class="pkg-sub">One-time · ~5–7 days · Bilingual businesses</div>
+      <div class="pkg-div"></div>
+      <ul class="pkg-feats">
+        <li>Everything in Starter</li>
+        <li>Full English / Spanish toggle</li>
+        <li>Up to 6 pages</li>
+        <li>Unique booking confirmation IDs</li>
+        <li>Customer self-lookup by phone number</li>
+        <li>Google Maps + hours embed</li>
+        <li>Priority email support</li>
+      </ul>
+    </div>
+    <div class="pkg reveal d2">
+      <div class="pkg-name">Premium</div>
+      <div class="pkg-price">$1,599<span>+</span></div>
+      <div class="pkg-sub">One-time · ~7–10 days · Multi-staff service businesses</div>
+      <div class="pkg-div"></div>
+      <ul class="pkg-feats">
+        <li>Custom design + up to 8 pages</li>
+        <li>Booking, payments, cancel/reschedule</li>
+        <li>Bilingual EN/ES toggle</li>
+        <li>Multi-staff — customers pick their person</li>
+        <li>Each staff member has own schedule</li>
+        <li>Private owner dashboard — manage from phone</li>
+        <li>Full payment history dashboard</li>
+        <li>SMS + Email notifications</li>
+        <li>1 full site revamp within first year</li>
+      </ul>
+    </div>
+    <div class="pkg reveal d3">
+      <div class="pkg-name">Restaurant</div>
+      <div class="pkg-price">$1,999<span>+</span></div>
+      <div class="pkg-sub">One-time · ~7–10 days · Food businesses only</div>
+      <div class="pkg-div"></div>
+      <ul class="pkg-feats">
+        <li>Custom design — mobile first</li>
+        <li>Bilingual menu display — owner updates without code</li>
+        <li>Online ordering — customers order from their phone</li>
+        <li>Table reservations system</li>
+        <li>Order + reservation SMS & Email alerts</li>
+        <li>Owner dashboard — all orders & reservations</li>
+        <li>Stripe OR Square payments</li>
+        <li>No DoorDash fees — ever</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- MONTHLY PLANS -->
+
+  <div class="monthly-wrap reveal">
+    <div class="monthly-header">
+      <div class="stag">Monthly Plans</div>
+      <h3 class="monthly-title">Site Care — Keep It Running</h3>
+      <p class="monthly-sub">Add to any package. We handle everything so you never have to think about your site again.</p>
+    </div>
+    <div class="monthly-grid">
+      <div class="monthly-card">
+        <div class="mc-name">Basic</div>
+        <div class="mc-price">$49<span>/mo</span></div>
+        <div class="mc-sub">Keep your site alive & secure</div>
+        <div class="mc-div"></div>
+        <ul class="mc-feats">
+          <li>Hosting included</li>
+          <li>Domain management</li>
+          <li>SSL security certificate</li>
+          <li>Uptime monitoring</li>
+          <li>Basic support</li>
+        </ul>
+        <a href="#contact" class="mc-btn">Add to My Package →</a>
+      </div>
+      <div class="monthly-card featured">
+        <div class="mc-pop">Best Value</div>
+        <div class="mc-name">Pro</div>
+        <div class="mc-price">$99<span>/mo</span></div>
+        <div class="mc-sub">Full care — hands off completely</div>
+        <div class="mc-div"></div>
+        <ul class="mc-feats">
+          <li>Everything in Basic</li>
+          <li>Custom business email</li>
+          <li>Unlimited small edits</li>
+          <li>Priority support</li>
+          <li>Monthly performance check</li>
+        </ul>
+        <a href="#contact" class="mc-btn featured-btn">Add to My Package →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESTAURANT HOOK -->
+
+  <div class="restaurant-hook reveal">
+    <div class="rh-left">
+      <div class="stag">For Restaurants</div>
+      <h3 class="rh-title">Stop Paying<br>DoorDash 30%</h3>
+      <p class="rh-desc">We build your own online ordering system so you keep 100% of every order. No commissions. No middleman. Just your food, your money.</p>
+      <a href="#contact" class="btn-primary" style="margin-top:16px;display:inline-flex;">Get Your Ordering System →</a>
+    </div>
+    <div class="rh-right">
+      <div class="rh-stat"><div class="rh-n">30%</div><div class="rh-l">DoorDash takes per order</div></div>
+      <div class="rh-stat"><div class="rh-n">$0</div><div class="rh-l">We take per order</div></div>
+      <div class="rh-stat"><div class="rh-n">100%</div><div class="rh-l">Yours to keep</div></div>
+    </div>
+  </div>
+  <div class="services-sub">
+    <div class="svc reveal"><span class="svc-icon">🌐</span><div class="svc-name">Marketing Sites</div><p class="svc-desc">Convert visitors into customers with a site that works as hard as you do.</p></div>
+    <div class="svc reveal d1"><span class="svc-icon">🌎</span><div class="svc-name">Bilingual EN/ES</div><p class="svc-desc">Reach every customer — English and Spanish, seamlessly toggled.</p></div>
+    <div class="svc reveal d2"><span class="svc-icon">📅</span><div class="svc-name">Booking Systems</div><p class="svc-desc">Real appointment management, no third-party fees, ever.</p></div>
+    <div class="svc reveal d3"><span class="svc-icon">⚙️</span><div class="svc-name">Owner Dashboards</div><p class="svc-desc">Log in from your phone and run your business from one place.</p></div>
+  </div>
+</section>
+
+<!-- PORTFOLIO -->
+
+<section id="portfolio">
+  <div class="stag">Our work</div>
+  <h2 class="sh reveal">PORTFOLIO</h2>
+  <div class="pf-grid">
+    <div class="pg reveal">
+      <div class="pg-tag">Restaurant & Food</div>
+      <div class="pg-title">Menu + Ordering</div>
+      <p class="pg-desc">Bilingual menu, online ordering, reservations, and an owner panel to update items without touching code.</p>
+      <div class="avail"><div class="adot"></div>Accepting clients</div>
+    </div>
+    <div class="pg reveal d1">
+      <div class="pg-tag">Service Business</div>
+      <div class="pg-title">Booking + Payments</div>
+      <p class="pg-desc">Barbers, groomers, tattoo artists, salons, cleaners — anyone who takes appointments. Book, pay, and manage from your phone.</p>
+      <div class="avail"><div class="adot"></div>Accepting clients</div>
+    </div>
+    <div class="pg reveal d2">
+      <div class="pg-tag">Retail & Stores</div>
+      <div class="pg-title">Product Catalog</div>
+      <p class="pg-desc">Owner-editable product catalog. Add items, update prices, manage inventory — no developer needed.</p>
+      <div class="avail"><div class="adot"></div>Accepting clients</div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+
+<section id="about">
+  <div class="stag">Who we are</div>
+  <h2 class="sh reveal">ABOUT<br>CLUTCH LABS</h2>
+  <div class="about-grid">
+    <div class="about-body reveal">
+      <p><strong>Clutch Labs is a web studio</strong> built for businesses that want more than a template site thrown together in an afternoon.</p>
+      <p>Every site we build is <em>custom from the ground up</em> — designed to look sharp, load fast, and turn visitors into paying customers.</p>
+      <p>We specialize in <strong>bilingual English & Spanish websites</strong> because we know that reaching every customer — in their language — is what separates good businesses from great ones.</p>
+      <p>We're not a big agency with a slow process. <strong>You deal with one person, directly</strong>, and your site gets built in days — not months.</p>
+    </div>
+    <div class="reveal d1">
+      <div class="stat-grid">
+        <div class="st"><div class="st-n">$0</div><div class="st-l">No Hidden Fees</div></div>
+        <div class="st"><div class="st-n">24h</div><div class="st-l">Response Guaranteed</div></div>
+        <div class="st"><div class="st-n">EN/ES</div><div class="st-l">Fully Bilingual</div></div>
+        <div class="st"><div class="st-n">CUSTOM</div><div class="st-l">No Templates Ever</div></div>
+      </div>
+      <div class="badge">
+        <div class="badge-i">🌎</div>
+        <div class="badge-t">Fluent in <strong>English & Spanish</strong> — we serve every client, zero language barrier.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+
+<section id="contact">
+  <div class="stag">Get in touch</div>
+  <h2 class="sh reveal">LET'S<br>BUILD.</h2>
+  <div class="contact-grid">
+    <div class="reveal">
+      <p class="c-desc">Tell us about your business and what you need. We'll get back to you fast — usually same day — and get to work even faster.</p>
+      <div class="c-info">
+        <div class="c-row"><div class="c-icon">📍</div>Bakersfield, California</div>
+        <div class="c-row"><div class="c-icon">✉️</div><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f69e939a9a99b6959a8382959e9a979485d895999b">[email&#160;protected]</a></div>
+        <div class="c-row"><div class="c-icon">🌎</div>English & Spanish spoken</div>
+      </div>
+    </div>
+    <div class="reveal d1">
+      <form class="cform" id="cform">
+        <div class="frow">
+          <div class="fg"><label>Your Name</label><input type="text" id="fn" placeholder="Maria Gonzalez" required></div>
+          <div class="fg"><label>Business Name</label><input type="text" id="fb" placeholder="Maria's Salon" required></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Phone</label><input type="tel" id="fp" placeholder="(661) 555-0100"></div>
+          <div class="fg"><label>Email</label><input type="email" id="fe" placeholder="maria@example.com" required></div>
+        </div>
+        <div class="fg">
+          <label>Package interested in</label>
+          <select id="fs">
+            <option value="">Select a package...</option>
+            <option>Starter — $499+ (solo service business)</option>
+            <option>Standard — $999+ (bilingual business)</option>
+            <option>Premium — $1,599+ (multi-staff service business)</option>
+            <option>Restaurant — $1,999+ (food business)</option>
+            <option>Not sure yet — let's talk</option>
+          </select>
+        </div>
+        <div class="fg"><label>Tell us about your business</label><textarea id="fm" placeholder="What does your business do? Do you need bilingual? Any special features in mind?"></textarea></div>
+        <button type="submit" class="sbtn" id="sbtn">Send Message <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+      </form>
+      <div class="fsuccess" id="fsuccess"><p>✓ MESSAGE RECEIVED — WE'LL BE IN TOUCH SOON.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+
+<footer>
+  <svg width="130" height="26" viewBox="0 0 130 26" fill="none">
+    <path d="M2 4 L2 22 L9 22 L9 19 L5.5 19 L5.5 7 L9 7 L9 4 Z" fill="#D4A017" opacity="0.5"/>
+    <rect x="2" y="4" width="8" height="2.5" fill="#D4A017" opacity="0.5"/>
+    <rect x="2" y="19.5" width="8" height="2.5" fill="#D4A017" opacity="0.5"/>
+    <text x="14" y="19" font-family="'Bebas Neue', sans-serif" font-size="17" fill="#3a3a3a" letter-spacing="1.5">CLUTCH</text>
+    <circle cx="79" cy="15" r="1.5" fill="#D4A017" opacity="0.4"/>
+    <text x="83" y="19" font-family="'Space Mono', monospace" font-size="7.5" fill="#333" letter-spacing="2">LABS</text>
+  </svg>
+  <div class="fl">
+    <a href="#services" class="flink">Services</a>
+    <a href="#portfolio" class="flink">Work</a>
+    <a href="#about" class="flink">About</a>
+    <a href="#contact" class="flink">Contact</a>
+  </div>
+  <div class="fcopy">© 2026 Clutch Labs</div>
+</footer>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+
+// Mobile menu
+function toggleMM() {
+document.getElementById(‘mmenu’).classList.toggle(‘open’);
+document.getElementById(‘ham’).classList.toggle(‘open’);
+}
+function closeMM() {
+document.getElementById(‘mmenu’).classList.remove(‘open’);
+document.getElementById(‘ham’).classList.remove(‘open’);
+}
+
+// Nav scroll
+window.addEventListener(‘scroll’, () => {
+document.getElementById(‘nav’).classList.toggle(‘scrolled’, window.scrollY > 50);
+});
+
+// Scroll reveal
+const obs = new IntersectionObserver(entries => {
+entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add(‘visible’); obs.unobserve(e.target); } });
+}, { threshold: 0.08 });
+document.querySelectorAll(’.reveal’).forEach(el => obs.observe(el));
+
+// Admin route
+function checkRoute() {
+const show = window.location.hash === ‘#admin’;
+document.getElementById(‘admin-panel’).classList.toggle(‘show’, show);
+}
+window.addEventListener(‘hashchange’, checkRoute);
+checkRoute();
+
+// Firebase logic
+window.addEventListener(‘firebaseReady’, () => {
+const fns = window._fbFns;
+const db = window._db;
+const auth = window._auth;
+
+if (!fns) {
+// Firebase not configured — fallback form
+document.getElementById(‘cform’).addEventListener(‘submit’, e => {
+e.preventDefault();
+document.getElementById(‘cform’).style.display = ‘none’;
+document.getElementById(‘fsuccess’).classList.add(‘show’);
+});
+document.getElementById(‘alog-btn’).addEventListener(‘click’, () => {
+document.getElementById(‘aerr’).textContent = ‘Firebase not configured yet. Add your config to the top of the file.’;
+document.getElementById(‘aerr’).classList.add(‘show’);
+});
+return;
+}
+
+const { collection, addDoc, getDocs, orderBy, query, updateDoc, doc, signInWithEmailAndPassword, signOut, onAuthStateChanged } = fns;
+
+// Auth state listener
+onAuthStateChanged(auth, user => {
+if (user) { showDash(); loadLeads(); } else { showLogin(); }
+});
+
+// Login
+document.getElementById(‘alog-btn’).addEventListener(‘click’, async () => {
+document.getElementById(‘aerr’).classList.remove(‘show’);
+try {
+await signInWithEmailAndPassword(auth, document.getElementById(‘aemail’).value, document.getElementById(‘apass’).value);
+} catch(e) { document.getElementById(‘aerr’).classList.add(‘show’); }
+});
+
+// Logout
+document.getElementById(‘aout-btn’).addEventListener(‘click’, async () => {
+await signOut(auth);
+document.getElementById(‘admin-panel’).classList.remove(‘show’);
+history.pushState(’’, ‘’, window.location.pathname);
+});
+
+function showLogin() {
+document.getElementById(‘alog-view’).style.display = ‘flex’;
+document.getElementById(‘adash’).classList.remove(‘show’);
+}
+function showDash() {
+document.getElementById(‘alog-view’).style.display = ‘none’;
+document.getElementById(‘adash’).classList.add(‘show’);
+}
+
+async function loadLeads() {
+const list = document.getElementById(‘leads-list’);
+list.innerHTML = ‘<div class="noleads">Loading…</div>’;
+try {
+const snap = await getDocs(query(collection(db, ‘leads’), orderBy(‘createdAt’, ‘desc’)));
+const leads = [];
+snap.forEach(d => leads.push({ id: d.id, …d.data() }));
+const total = leads.length;
+const done = leads.filter(l => l.contacted).length;
+document.getElementById(‘s-total’).textContent = total;
+document.getElementById(‘s-new’).textContent = total - done;
+document.getElementById(‘s-done’).textContent = done;
+if (!leads.length) { list.innerHTML = ‘<div class="noleads">No inquiries yet. Share your site and get that first lead!</div>’; return; }
+list.innerHTML = leads.map(l => `<div class="lead ${l.contacted ? 'done' : ''}" id="lead-${l.id}"> <div> <div class="lead-name">${l.name} — ${l.business}</div> <div class="lead-meta">${l.email} · ${l.phone || 'No phone'} · ${l.createdAt ? new Date(l.createdAt).toLocaleDateString() : ''}</div> ${l.service ?`<div class="lead-svc">${l.service}</div>` : ''} <div class="lead-msg">${l.message || '—'}</div> </div> <button class="markbtn" onclick="markLead('${l.id}',${!!l.contacted})">${l.contacted ? 'Contacted ✓' : 'Mark Contacted'}</button> </div>`).join(’’);
+} catch(e) { list.innerHTML = ‘<div class="noleads">Error loading leads. Check Firebase config and Firestore rules.</div>’; }
+}
+
+window.markLead = async (id, current) => {
+try { await updateDoc(doc(db, ‘leads’, id), { contacted: !current }); loadLeads(); } catch(e) {}
+};
+
+// Contact form
+document.getElementById(‘cform’).addEventListener(‘submit’, async e => {
+e.preventDefault();
+const btn = document.getElementById(‘sbtn’);
+btn.disabled = true; btn.textContent = ‘Sending…’;
+try {
+await addDoc(collection(db, ‘leads’), {
+name: document.getElementById(‘fn’).value,
+business: document.getElementById(‘fb’).value,
+phone: document.getElementById(‘fp’).value,
+email: document.getElementById(‘fe’).value,
+service: document.getElementById(‘fs’).value,
+message: document.getElementById(‘fm’).value,
+contacted: false,
+createdAt: Date
