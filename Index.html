@@ -306,7 +306,6 @@ footer { background: var(--dark); border-top: 1px solid var(--border); padding: 
 
 /* ADMIN PANEL */
 #admin-panel { display: none; position: fixed; inset: 0; background: #050505; z-index: 1000; overflow-y: auto; }
-#admin-panel.show { display: block; }
 .alog { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
 .alog-box { width: 100%; max-width: 360px; border: 1px solid var(--border2); background: var(--card); padding: 44px 36px; }
 .alog-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.08em; margin-bottom: 6px; }
@@ -771,131 +770,150 @@ footer { background: var(--dark); border-top: 1px solid var(--border); padding: 
   <div class="fcopy">© 2026 Clutch Labs</div>
 </footer>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
-
-// Mobile menu
+<script>
+// ── Mobile menu ──
 function toggleMM() {
-document.getElementById(‘mmenu’).classList.toggle(‘open’);
-document.getElementById(‘ham’).classList.toggle(‘open’);
+  document.getElementById('mmenu').classList.toggle('open');
+  document.getElementById('ham').classList.toggle('open');
 }
 function closeMM() {
-document.getElementById(‘mmenu’).classList.remove(‘open’);
-document.getElementById(‘ham’).classList.remove(‘open’);
+  document.getElementById('mmenu').classList.remove('open');
+  document.getElementById('ham').classList.remove('open');
 }
 
-// Nav scroll
-window.addEventListener(‘scroll’, () => {
-document.getElementById(‘nav’).classList.toggle(‘scrolled’, window.scrollY > 50);
+// ── Nav scroll ──
+window.addEventListener('scroll', () => {
+  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 50);
 });
 
-// Scroll reveal
+// ── Scroll reveal ──
 const obs = new IntersectionObserver(entries => {
-entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add(‘visible’); obs.unobserve(e.target); } });
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
 }, { threshold: 0.08 });
-document.querySelectorAll(’.reveal’).forEach(el => obs.observe(el));
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 
-// Admin route
+// ── Contact form ──
+document.getElementById('cform').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('sbtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  const data = {
+    name: document.getElementById('fn').value,
+    business: document.getElementById('fb').value,
+    phone: document.getElementById('fp').value,
+    email: document.getElementById('fe').value,
+    service: document.getElementById('fs').value,
+    message: document.getElementById('fm').value,
+    contacted: false,
+    createdAt: Date.now()
+  };
+  try {
+    if (window._db && window._fbFns) {
+      await window._fbFns.addDoc(window._fbFns.collection(window._db, 'leads'), data);
+    }
+  } catch(err) { console.warn('Lead save:', err.message); }
+  document.getElementById('cform').style.display = 'none';
+  document.getElementById('fsuccess').classList.add('show');
+});
+
+// ── Admin panel ──
 function checkRoute() {
-const show = window.location.hash === ‘#admin’;
-document.getElementById(‘admin-panel’).classList.toggle(‘show’, show);
-}
-window.addEventListener(‘hashchange’, checkRoute);
-checkRoute();
-
-// Contact form — standalone handler works with or without Firebase
-document.getElementById(‘cform’).addEventListener(‘submit’, async function(e) {
-e.preventDefault();
-const btn = document.getElementById(‘sbtn’);
-btn.disabled = true;
-btn.textContent = ‘Sending…’;
-const data = {
-name: document.getElementById(‘fn’).value,
-business: document.getElementById(‘fb’).value,
-phone: document.getElementById(‘fp’).value,
-email: document.getElementById(‘fe’).value,
-service: document.getElementById(‘fs’).value,
-message: document.getElementById(‘fm’).value,
-contacted: false,
-createdAt: Date.now()
-};
-try {
-if (window._db && window._fbFns) {
-await window._fbFns.addDoc(window._fbFns.collection(window._db, ‘leads’), data);
-}
-} catch(err) { console.error(‘Lead error:’, err); }
-document.getElementById(‘cform’).style.display = ‘none’;
-document.getElementById(‘fsuccess’).classList.add(‘show’);
-});
-
-// Firebase logic
-window.addEventListener(‘firebaseReady’, () => {
-const fns = window._fbFns;
-const db = window._db;
-const auth = window._auth;
-
-if (!fns) {
-// Firebase not configured — fallback form
-document.getElementById(‘cform’).addEventListener(‘submit’, e => {
-e.preventDefault();
-document.getElementById(‘cform’).style.display = ‘none’;
-document.getElementById(‘fsuccess’).classList.add(‘show’);
-});
-document.getElementById(‘alog-btn’).addEventListener(‘click’, () => {
-document.getElementById(‘aerr’).textContent = ‘Firebase not configured yet. Add your config to the top of the file.’;
-document.getElementById(‘aerr’).classList.add(‘show’);
-});
-return;
+  const isAdmin = window.location.hash === '#admin';
+  const panel = document.getElementById('admin-panel');
+  if (isAdmin) {
+    panel.style.display = 'block';
+    initAdmin();
+  } else {
+    panel.style.display = 'none';
+  }
 }
 
-const { collection, addDoc, getDocs, orderBy, query, updateDoc, doc, signInWithEmailAndPassword, signOut, onAuthStateChanged } = fns;
+let adminInited = false;
+function initAdmin() {
+  if (adminInited) return;
+  adminInited = true;
 
-// Auth state listener
-onAuthStateChanged(auth, user => {
-if (user) { showDash(); loadLeads(); } else { showLogin(); }
-});
+  function waitForFirebase(cb) {
+    if (window._fbFns && window._auth) { cb(); return; }
+    setTimeout(() => waitForFirebase(cb), 100);
+  }
 
-// Login
-document.getElementById(‘alog-btn’).addEventListener(‘click’, async () => {
-document.getElementById(‘aerr’).classList.remove(‘show’);
-try {
-await signInWithEmailAndPassword(auth, document.getElementById(‘aemail’).value, document.getElementById(‘apass’).value);
-} catch(e) { document.getElementById(‘aerr’).classList.add(‘show’); }
-});
+  waitForFirebase(() => {
+    const { collection, getDocs, orderBy, query, updateDoc, doc, signInWithEmailAndPassword, signOut, onAuthStateChanged } = window._fbFns;
+    const db = window._db;
+    const auth = window._auth;
 
-// Logout
-document.getElementById(‘aout-btn’).addEventListener(‘click’, async () => {
-await signOut(auth);
-document.getElementById(‘admin-panel’).classList.remove(‘show’);
-history.pushState(’’, ‘’, window.location.pathname);
-});
+    onAuthStateChanged(auth, user => {
+      if (user) { showDash(); loadLeads(); }
+      else { showLogin(); }
+    });
 
-function showLogin() {
-document.getElementById(‘alog-view’).style.display = ‘flex’;
-document.getElementById(‘adash’).classList.remove(‘show’);
+    document.getElementById('alog-btn').addEventListener('click', async () => {
+      document.getElementById('aerr').classList.remove('show');
+      try {
+        await signInWithEmailAndPassword(auth,
+          document.getElementById('aemail').value,
+          document.getElementById('apass').value
+        );
+      } catch(e) {
+        document.getElementById('aerr').classList.add('show');
+      }
+    });
+
+    document.getElementById('aout-btn').addEventListener('click', async () => {
+      await signOut(auth);
+      document.getElementById('admin-panel').style.display = 'none';
+      history.pushState('', '', window.location.pathname);
+      adminInited = false;
+    });
+
+    function showLogin() {
+      document.getElementById('alog-view').style.display = 'flex';
+      document.getElementById('adash').classList.remove('show');
+    }
+    function showDash() {
+      document.getElementById('alog-view').style.display = 'none';
+      document.getElementById('adash').classList.add('show');
+    }
+
+    async function loadLeads() {
+      const list = document.getElementById('leads-list');
+      list.innerHTML = '<div class="noleads">Loading...</div>';
+      try {
+        const snap = await getDocs(query(collection(db, 'leads'), orderBy('createdAt', 'desc')));
+        const leads = [];
+        snap.forEach(d => leads.push({ id: d.id, ...d.data() }));
+        const total = leads.length;
+        const done = leads.filter(l => l.contacted).length;
+        document.getElementById('s-total').textContent = total;
+        document.getElementById('s-new').textContent = total - done;
+        document.getElementById('s-done').textContent = done;
+        if (!leads.length) {
+          list.innerHTML = '<div class="noleads">No inquiries yet. Share your site!</div>';
+          return;
+        }
+        list.innerHTML = leads.map(l => `
+          <div class="lead ${l.contacted ? 'done' : ''}" id="lead-${l.id}">
+            <div>
+              <div class="lead-name">${l.name} — ${l.business}</div>
+              <div class="lead-meta">${l.email} · ${l.phone || 'No phone'} · ${l.createdAt ? new Date(l.createdAt).toLocaleDateString() : ''}</div>
+              ${l.service ? `<div class="lead-svc">${l.service}</div>` : ''}
+              <div class="lead-msg">${l.message || '—'}</div>
+            </div>
+            <button class="markbtn" onclick="markLead('${l.id}',${!!l.contacted})">${l.contacted ? 'Contacted ✓' : 'Mark Contacted'}</button>
+          </div>`).join('');
+      } catch(e) {
+        list.innerHTML = '<div class="noleads">Error loading leads.</div>';
+      }
+    }
+
+    window.markLead = async (id, current) => {
+      try { await updateDoc(doc(db, 'leads', id), { contacted: !current }); loadLeads(); } catch(e) {}
+    };
+  });
 }
-function showDash() {
-document.getElementById(‘alog-view’).style.display = ‘none’;
-document.getElementById(‘adash’).classList.add(‘show’);
-}
 
-async function loadLeads() {
-const list = document.getElementById(‘leads-list’);
-list.innerHTML = ‘<div class="noleads">Loading…</div>’;
-try {
-const snap = await getDocs(query(collection(db, ‘leads’), orderBy(‘createdAt’, ‘desc’)));
-const leads = [];
-snap.forEach(d => leads.push({ id: d.id, …d.data() }));
-const total = leads.length;
-const done = leads.filter(l => l.contacted).length;
-document.getElementById(‘s-total’).textContent = total;
-document.getElementById(‘s-new’).textContent = total - done;
-document.getElementById(‘s-done’).textContent = done;
-if (!leads.length) { list.innerHTML = ‘<div class="noleads">No inquiries yet. Share your site and get that first lead!</div>’; return; }
-list.innerHTML = leads.map(l => `<div class="lead ${l.contacted ? 'done' : ''}" id="lead-${l.id}"> <div> <div class="lead-name">${l.name} — ${l.business}</div> <div class="lead-meta">${l.email} · ${l.phone || 'No phone'} · ${l.createdAt ? new Date(l.createdAt).toLocaleDateString() : ''}</div> ${l.service ?`<div class="lead-svc">${l.service}</div>` : ''} <div class="lead-msg">${l.message || '—'}</div> </div> <button class="markbtn" onclick="markLead('${l.id}',${!!l.contacted})">${l.contacted ? 'Contacted ✓' : 'Mark Contacted'}</button> </div>`).join(’’);
-} catch(e) { list.innerHTML = ‘<div class="noleads">Error loading leads. Check Firebase config and Firestore rules.</div>’; }
-}
-
-window.markLead = async (id, current) => {
-try { await updateDoc(doc(db, ‘leads’, id), { contacted: !current }); loadLeads(); } catch(e) {}
-};
-});
+window.addEventListener('hashchange', checkRoute);
+window.addEventListener('load', checkRoute);
+</script>
